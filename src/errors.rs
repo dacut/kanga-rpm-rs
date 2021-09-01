@@ -3,11 +3,16 @@ use std::io;
 
 use thiserror::Error;
 
+use crate::FileDigestAlgorithm;
+
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum RPMError {
     #[error(transparent)]
     Io(#[from] io::Error),
+
+    #[error(transparent)]
+    Hex(#[from] hex::FromHexError),
 
     #[error("{0}")]
     Nom(String),
@@ -42,16 +47,24 @@ pub enum RPMError {
     #[error("invalid tag array index {tag} with {index} while bounded at {bound}")]
     InvalidTagIndex { tag: String, index: u32, bound: u32 },
 
+    #[error("invalid tag value enum varaint for {tag} with {variant}")]
+    InvalidTagValueEnumVariant { tag: String, variant: u32 },
+
     #[error("unsupported lead major version {0} - only version 3 is supported")]
     InvalidLeadMajorVersion(u8),
+
     #[error("unsupported lead major version {0} - only version 0 is supported")]
     InvalidLeadMinorVersion(u8),
+
     #[error("invalid type - expected 0 or 1 but got {0}")]
     InvalidLeadPKGType(u16),
+
     #[error("invalid os-type - expected 1 but got {0}")]
     InvalidLeadOSType(u16),
+
     #[error("invalid signature-type - expected 5 but got {0}")]
     InvalidLeadSignatureType(u16),
+
     #[error("invalid size of reserved area - expected length of {expected} but got {actual}")]
     InvalidReservedSpaceSize { expected: u16, actual: usize },
 
@@ -60,8 +73,10 @@ pub enum RPMError {
 
     #[error("signature packet not found in what is supposed to be a signature")]
     NoSignatureFound,
+
     #[error("error creating signature: {0}")]
     SignError(Box<dyn std::error::Error>),
+
     #[error("error parsing key - {details}. underlying error was: {source}")]
     KeyLoadError {
         source: Box<dyn std::error::Error>,
@@ -79,6 +94,9 @@ pub enum RPMError {
 
     #[error("unknown compressor type {0} - only gzip and none are supported")]
     UnknownCompressorType(String),
+
+    #[error("unsupported file digest algorithm {0:?}")]
+    UnsupportedFileDigestAlgorithm(FileDigestAlgorithm),
 }
 
 impl From<nom::Err<(&[u8], nom::error::ErrorKind)>> for RPMError {

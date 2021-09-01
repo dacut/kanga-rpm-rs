@@ -1,29 +1,27 @@
+use super::signature_builder::{Empty, SignatureHeaderBuilder};
+use crate::{IndexSignatureTag, IndexTag, RPMError, TypeName, HEADER_MAGIC, RPMFILE_CONFIG, RPMFILE_DOC};
+use chrono::offset::TimeZone;
+use enum_primitive_derive::Primitive;
 use nom::bytes::complete;
 use nom::number::complete::{be_i16, be_i32, be_i64, be_i8, be_u32, be_u8};
-
-use crate::constants::{self, *};
-use chrono::offset::TimeZone;
-use num_traits::FromPrimitive;
-use std::convert::TryInto;
-use std::fmt;
-use std::path::PathBuf;
-
-use super::*;
-use crate::errors::*;
+use num::{FromPrimitive, ToPrimitive};
+use std::{
+    convert::TryInto,
+    fmt::{Debug, Display, Formatter, Result as FmtResult},
+    io::{BufRead, Write},
+    path::PathBuf,
+};
 
 /// Header tag.
 ///
 /// Each and every header has a particular header tag that identifies the type of
 /// the header the format / information contained in that header.
-pub trait Tag: num::FromPrimitive + num::ToPrimitive + PartialEq + fmt::Display + fmt::Debug + Copy + TypeName {}
+pub trait Tag: FromPrimitive + ToPrimitive + PartialEq + Display + Debug + Copy + TypeName {}
 
-impl<T> Tag for T where
-    T: num::FromPrimitive + num::ToPrimitive + PartialEq + fmt::Display + fmt::Debug + Copy + TypeName
-{
-}
+impl<T> Tag for T where T: FromPrimitive + ToPrimitive + PartialEq + Display + Debug + Copy + TypeName {}
 
 #[derive(Debug, PartialEq)]
-pub struct Header<T: num::FromPrimitive> {
+pub struct Header<T: FromPrimitive> {
     pub(crate) index_header: IndexHeader,
     pub(crate) index_entries: Vec<IndexEntry<T>>,
     pub(crate) store: Vec<u8>,
@@ -33,7 +31,7 @@ impl<T> Header<T>
 where
     T: Tag,
 {
-    pub(crate) fn parse<I: std::io::BufRead>(input: &mut I) -> Result<Header<T>, RPMError> {
+    pub(crate) fn parse<I: BufRead>(input: &mut I) -> Result<Header<T>, RPMError> {
         let mut buf: [u8; 16] = [0; 16];
         input.read_exact(&mut buf)?;
         let index_header = IndexHeader::parse(&buf)?;
@@ -110,7 +108,7 @@ where
         })
     }
 
-    pub(crate) fn write<W: std::io::Write>(&self, out: &mut W) -> Result<(), RPMError> {
+    pub(crate) fn write<W: Write>(&self, out: &mut W) -> Result<(), RPMError> {
         self.index_header.write(out)?;
         for entry in &self.index_entries {
             entry.write_index(out)?;
@@ -257,7 +255,7 @@ impl Header<IndexSignatureTag> {
         SignatureHeaderBuilder::<Empty>::new()
     }
 
-    pub(crate) fn parse_signature<I: std::io::BufRead>(input: &mut I) -> Result<Header<IndexSignatureTag>, RPMError> {
+    pub(crate) fn parse_signature<I: BufRead>(input: &mut I) -> Result<Header<IndexSignatureTag>, RPMError> {
         let result = Self::parse(input)?;
         // this structure is aligned to 8 bytes - rest is filled up with zeros.
         // if the size of our store is not a modulo of 8, we discard bytes to align to the 8 byte boundary.
@@ -270,7 +268,7 @@ impl Header<IndexSignatureTag> {
         Ok(result)
     }
 
-    pub(crate) fn write_signature<W: std::io::Write>(&self, out: &mut W) -> Result<(), RPMError> {
+    pub(crate) fn write_signature<W: Write>(&self, out: &mut W) -> Result<(), RPMError> {
         self.write(out)?;
         let modulo = self.index_header.header_size % 8;
         if modulo > 0 {
@@ -437,12 +435,12 @@ pub struct FileOwnership {
 
 /// Declaration what category this file belongs to
 /// @todo must be bitflags
-#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, enum_primitive_derive::Primitive)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Primitive)]
 #[repr(i32)]
 pub enum FileCategory {
     None = 0i32,
-    Config = constants::RPMFILE_CONFIG,
-    Doc = constants::RPMFILE_DOC,
+    Config = RPMFILE_CONFIG,
+    Doc = RPMFILE_DOC,
 }
 
 impl Default for FileCategory {
@@ -451,24 +449,39 @@ impl Default for FileCategory {
     }
 }
 
+// copied from rpmpgp.h
+// should be technically equiv to
+// `pgp::crypto::hash::HashAlgorithm`
+// but that is only available with feature `signature`
+const PGPHASHALGO_MD5: i32 = 1;
+const PGPHASHALGO_SHA1: i32 = 2;
+const PGPHASHALGO_RIPEMD160: i32 = 3;
+const PGPHASHALGO_MD2: i32 = 5;
+const PGPHASHALGO_TIGER192: i32 = 6;
+const PGPHASHALGO_HAVAL_5_160: i32 = 7;
+const PGPHASHALGO_SHA256: i32 = 8;
+const PGPHASHALGO_SHA384: i32 = 9;
+const PGPHASHALGO_SHA512: i32 = 10;
+const PGPHASHALGO_SHA224: i32 = 11;
+
+#[derive(Debug, Clone, Copy, Primitive)]
 #[repr(i32)]
-#[derive(Debug, Clone, Copy, enum_primitive_derive::Primitive)]
 pub enum FileDigestAlgorithm {
     // broken and very broken
-    Md5 = constants::PGPHASHALGO_MD5,
-    Sha1 = constants::PGPHASHALGO_SHA1,
-    Md2 = constants::PGPHASHALGO_MD2,
+    Md5 = PGPHASHALGO_MD5,
+    Sha1 = PGPHASHALGO_SHA1,
+    Md2 = PGPHASHALGO_MD2,
 
     // not proven to be broken, weaker variants broken
     #[allow(non_camel_case_types)]
-    Haval_5_160 = constants::PGPHASHALGO_HAVAL_5_160, // not part of PGP
-    Ripemd160 = constants::PGPHASHALGO_RIPEMD160,
+    Haval_5_160 = PGPHASHALGO_HAVAL_5_160, // not part of PGP
+    Ripemd160 = PGPHASHALGO_RIPEMD160,
 
-    Tiger192 = constants::PGPHASHALGO_TIGER192, // not part of PGP
-    Sha2_256 = constants::PGPHASHALGO_SHA256,
-    Sha2_384 = constants::PGPHASHALGO_SHA384,
-    Sha2_512 = constants::PGPHASHALGO_SHA512,
-    Sha2_224 = constants::PGPHASHALGO_SHA224,
+    Tiger192 = PGPHASHALGO_TIGER192, // not part of PGP
+    Sha2_256 = PGPHASHALGO_SHA256,
+    Sha2_384 = PGPHASHALGO_SHA384,
+    Sha2_512 = PGPHASHALGO_SHA512,
+    Sha2_224 = PGPHASHALGO_SHA224,
 }
 
 impl Default for FileDigestAlgorithm {
@@ -630,7 +643,7 @@ impl IndexHeader {
         })
     }
 
-    pub(crate) fn write<W: std::io::Write>(&self, out: &mut W) -> Result<(), RPMError> {
+    pub(crate) fn write<W: Write>(&self, out: &mut W) -> Result<(), RPMError> {
         out.write_all(&self.magic)?;
         out.write_all(&self.version.to_be_bytes())?;
         out.write_all(&[0; 4])?;
@@ -649,24 +662,22 @@ impl IndexHeader {
     }
 }
 
-/// A singel entry within the [`IndexHeader`](self::IndexHeader)
+/// A single entry within the [`IndexHeader`](self::IndexHeader)
 #[derive(Debug, PartialEq)]
-pub(crate) struct IndexEntry<T: num::FromPrimitive> {
+pub(crate) struct IndexEntry<T: FromPrimitive> {
     pub(crate) tag: T,
     pub(crate) data: IndexData,
     pub(crate) offset: i32,
     pub(crate) num_items: u32,
 }
 
-use crate::constants::TypeName;
-
-impl<T: num::FromPrimitive + num::ToPrimitive + fmt::Debug + TypeName> IndexEntry<T> {
+impl<T: FromPrimitive + ToPrimitive + Debug + TypeName> IndexEntry<T> {
     // 16 bytes
     pub(crate) fn parse(input: &[u8]) -> Result<(&[u8], Self), RPMError> {
         //first 4 bytes are the tag.
         let (input, raw_tag) = be_u32(input)?;
 
-        let tag: T = num::FromPrimitive::from_u32(raw_tag).ok_or_else(|| RPMError::InvalidTag {
+        let tag: T = FromPrimitive::from_u32(raw_tag).ok_or_else(|| RPMError::InvalidTag {
             raw_tag: raw_tag,
             store_type: T::type_name(),
         })?;
@@ -696,7 +707,7 @@ impl<T: num::FromPrimitive + num::ToPrimitive + fmt::Debug + TypeName> IndexEntr
         ))
     }
 
-    pub(crate) fn write_index<W: std::io::Write>(&self, out: &mut W) -> Result<(), RPMError> {
+    pub(crate) fn write_index<W: Write>(&self, out: &mut W) -> Result<(), RPMError> {
         let mut written = out.write(&self.tag.to_u32().unwrap().to_be_bytes())?;
         written += out.write(&self.data.to_u32().to_be_bytes())?;
         written += out.write(&self.offset.to_be_bytes())?;
@@ -730,8 +741,8 @@ pub(crate) enum IndexData {
     I18NString(Vec<String>),
 }
 
-impl fmt::Display for IndexData {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Display for IndexData {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
         let rep = match self {
             IndexData::Null => "Null",
             IndexData::Bin(_) => "Bin",

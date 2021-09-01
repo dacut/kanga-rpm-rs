@@ -57,16 +57,23 @@
 //! # }
 //! ```
 
+mod constants;
 mod errors;
-pub use crate::errors::*;
-
-pub(crate) mod constants;
-pub use crate::constants::*;
-
+mod rpm;
 mod sequential_cursor;
 
-mod rpm;
-pub use crate::rpm::*;
+#[cfg(feature = "signature-meta")]
+pub use crate::rpm::{Empty, SignatureHeaderBuilder, WithDigest, WithSignature};
+pub(crate) use crate::rpm::{IndexData, IndexEntry};
+pub use crate::{
+    constants::*,
+    errors::RPMError,
+    rpm::{
+        signature, Compressor, Dependency, FileCategory, FileDigest, FileDigestAlgorithm, FileEntry, FileMode,
+        FileOwnership, Header, Lead, RPMBuilder, RPMFileEntry, RPMFileOptions, RPMFileOptionsBuilder, RPMPackage,
+        RPMPackageMetadata,
+    },
+};
 
 #[cfg(test)]
 mod tests;

@@ -1,8 +1,12 @@
 use super::*;
-use std::io::prelude::*;
-use std::io::BufReader;
-use std::process::Stdio;
-use std::str::FromStr;
+#[cfg(feature = "signature-meta")]
+use crate::rpm::signature::{self, Verifying};
+use crate::{Compressor, Dependency, RPMBuilder};
+use std::{
+    io::{prelude::*, BufReader},
+    process::Stdio,
+    str::FromStr,
+};
 
 fn test_rpm_file_path() -> std::path::PathBuf {
     let mut rpm_path = cargo_manifest_dir();
@@ -18,9 +22,6 @@ fn cargo_out_dir() -> std::path::PathBuf {
     cargo_manifest_dir().join("target")
 }
 
-#[cfg(feature = "signature-meta")]
-use signature::{self, Verifying};
-
 #[cfg(feature = "signature-pgp")]
 mod pgp {
     use super::*;
@@ -28,13 +29,11 @@ mod pgp {
 
     #[test]
     #[serial_test::serial]
-    fn create_full_rpm_with_signature_and_verify_externally(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn create_full_rpm_with_signature_and_verify_externally() -> Result<(), Box<dyn std::error::Error>> {
         let _ = env_logger::try_init();
         let (signing_key, _) = crate::signature::pgp::test::load_asc_keys();
 
-        let signer = Signer::load_from_asc_bytes(signing_key.as_ref())
-            .expect("Must load signer from signing key");
+        let signer = Signer::load_from_asc_bytes(signing_key.as_ref()).expect("Must load signer from signing key");
 
         let cargo_file = cargo_manifest_dir().join("Cargo.toml");
         let out_file = cargo_out_dir().join("test.rpm");
@@ -42,36 +41,16 @@ mod pgp {
         let mut f = std::fs::File::create(out_file)?;
         let pkg = RPMBuilder::new("test", "1.0.0", "MIT", "x86_64", "some package")
             .compression(Compressor::from_str("gzip")?)
+            .with_file(cargo_file.to_str().unwrap(), RPMFileOptions::new("/etc/foobar/foo.toml"))?
+            .with_file(cargo_file.to_str().unwrap(), RPMFileOptions::new("/etc/foobar/zazz.toml"))?
             .with_file(
                 cargo_file.to_str().unwrap(),
-                RPMFileOptions::new("/etc/foobar/foo.toml"),
+                RPMFileOptions::new("/etc/foobar/hugo/bazz.toml").mode(0o100_777).is_config(),
             )?
-            .with_file(
-                cargo_file.to_str().unwrap(),
-                RPMFileOptions::new("/etc/foobar/zazz.toml"),
-            )?
-            .with_file(
-                cargo_file.to_str().unwrap(),
-                RPMFileOptions::new("/etc/foobar/hugo/bazz.toml")
-                    .mode(0o100_777)
-                    .is_config(),
-            )?
-            .with_file(
-                cargo_file.to_str().unwrap(),
-                RPMFileOptions::new("/etc/foobar/bazz.toml"),
-            )?
-            .with_file(
-                cargo_file.to_str().unwrap(),
-                RPMFileOptions::new("/etc/foobar/hugo/aa.toml"),
-            )?
-            .with_file(
-                cargo_file.to_str().unwrap(),
-                RPMFileOptions::new("/var/honollulu/bazz.toml"),
-            )?
-            .with_file(
-                cargo_file.to_str().unwrap(),
-                RPMFileOptions::new("/etc/Cargo.toml"),
-            )?
+            .with_file(cargo_file.to_str().unwrap(), RPMFileOptions::new("/etc/foobar/bazz.toml"))?
+            .with_file(cargo_file.to_str().unwrap(), RPMFileOptions::new("/etc/foobar/hugo/aa.toml"))?
+            .with_file(cargo_file.to_str().unwrap(), RPMFileOptions::new("/var/honollulu/bazz.toml"))?
+            .with_file(cargo_file.to_str().unwrap(), RPMFileOptions::new("/etc/Cargo.toml"))?
             .epoch(1)
             .pre_install_script("echo preinst")
             .add_changelog_entry("me", "was awesome, eh?", 123_123_123)
@@ -83,21 +62,18 @@ mod pgp {
         let epoch = pkg.metadata.header.get_epoch()?;
         assert_eq!(1, epoch);
 
-        let yum_cmd = "yum --disablerepo=updates,updates-testing,updates-modular,fedora-modular install -y /out/test.rpm;";
-        let dnf_cmd = "dnf --disablerepo=updates,updates-testing,updates-modular,fedora-modular install -y /out/test.rpm;";
+        let yum_cmd =
+            "yum --disablerepo=updates,updates-testing,updates-modular,fedora-modular install -y /out/test.rpm;";
+        let dnf_cmd =
+            "dnf --disablerepo=updates,updates-testing,updates-modular,fedora-modular install -y /out/test.rpm;";
         let rpm_sig_check = "rpm  -vv --checksig /out/test.rpm 2>&1;".to_string();
 
-        [
-            ("fedora:31", rpm_sig_check.as_str()),
-            ("fedora:31", dnf_cmd),
-            ("centos:8", yum_cmd),
-            ("centos:7", yum_cmd),
-        ]
-        .iter()
-        .try_for_each(|(image, cmd)| {
-            podman_container_launcher(cmd, image, vec![])?;
-            Ok(())
-        })
+        [("fedora:31", rpm_sig_check.as_str()), ("fedora:31", dnf_cmd), ("centos:8", yum_cmd), ("centos:7", yum_cmd)]
+            .iter()
+            .try_for_each(|(image, cmd)| {
+                podman_container_launcher(cmd, image, vec![])?;
+                Ok(())
+            })
     }
 
     #[test]
@@ -113,29 +89,18 @@ mod pgp {
             let signer = Signer::load_from_asc_bytes(signing_key.as_ref())?;
 
             let mut f = std::fs::File::create(&out_file)?;
-            let pkg = RPMBuilder::new(
-                "roundtrip",
-                "1.0.0",
-                "MIT",
-                "x86_64",
-                "spins round and round",
-            )
-            .compression(Compressor::from_str("gzip")?)
-            .with_file(
-                cargo_file.to_str().unwrap(),
-                RPMFileOptions::new("/etc/foobar/hugo/bazz.toml")
-                    .mode(0o100_777)
-                    .is_config(),
-            )?
-            .with_file(
-                cargo_file.to_str().unwrap(),
-                RPMFileOptions::new("/etc/Cargo.toml"),
-            )?
-            .epoch(3)
-            .pre_install_script("echo preinst")
-            .add_changelog_entry("you", "yada yada", 12_317_712)
-            .requires(Dependency::any("rpm-sign".to_string()))
-            .build_and_sign(&signer)?;
+            let pkg = RPMBuilder::new("roundtrip", "1.0.0", "MIT", "x86_64", "spins round and round")
+                .compression(Compressor::from_str("gzip")?)
+                .with_file(
+                    cargo_file.to_str().unwrap(),
+                    RPMFileOptions::new("/etc/foobar/hugo/bazz.toml").mode(0o100_777).is_config(),
+                )?
+                .with_file(cargo_file.to_str().unwrap(), RPMFileOptions::new("/etc/Cargo.toml"))?
+                .epoch(3)
+                .pre_install_script("echo preinst")
+                .add_changelog_entry("you", "yada yada", 12_317_712)
+                .requires(Dependency::any("rpm-sign".to_string()))
+                .build_and_sign(&signer)?;
 
             pkg.write(&mut f)?;
             let epoch = pkg.metadata.header.get_epoch()?;
@@ -234,11 +199,9 @@ gpg --verify /out/test.file.sig /out/test.file 2>&1
 
 "#.to_owned();
 
-        podman_container_launcher(cmd.as_str(), "fedora:31", vec![])
-            .expect("Container execution must be flawless");
+        podman_container_launcher(cmd.as_str(), "fedora:31", vec![]).expect("Container execution must be flawless");
 
-        let verifier =
-            Verifier::load_from_asc_bytes(verification_key.as_slice()).expect("Must load");
+        let verifier = Verifier::load_from_asc_bytes(verification_key.as_slice()).expect("Must load");
 
         let raw_sig = std::fs::read(&test_file_sig).expect("must laod signature");
         let data = std::fs::read(&test_file).expect("must laod file");
@@ -288,11 +251,7 @@ fn wait_and_print_helper(mut child: std::process::Child, stdin_cmd: &str) -> std
     Ok(())
 }
 
-fn podman_container_launcher(
-    cmd: &str,
-    image: &str,
-    mut mappings: Vec<String>,
-) -> std::io::Result<()> {
+fn podman_container_launcher(cmd: &str, image: &str, mut mappings: Vec<String>) -> std::io::Result<()> {
     // always mount assets and out directory into container
     let var_cache = cargo_manifest_dir().join("dnf-cache");
     let _ = std::fs::create_dir(var_cache.as_path());
@@ -300,12 +259,10 @@ fn podman_container_launcher(
     let out = format!("{}:/out:z", cargo_out_dir().display());
     let assets = format!("{}/test_assets:/assets:z", cargo_manifest_dir().display());
     mappings.extend(vec![out, assets, var_cache]);
-    let mut args = mappings
-        .iter()
-        .fold(vec!["run", "-i", "--rm"], |mut acc, mapping| {
-            acc.extend(vec!["-v", mapping]);
-            acc
-        });
+    let mut args = mappings.iter().fold(vec!["run", "-i", "--rm"], |mut acc, mapping| {
+        acc.extend(vec!["-v", mapping]);
+        acc
+    });
     args.extend(vec![image, "sh"]);
 
     let mut podman_cmd = std::process::Command::new("podman");
@@ -416,12 +373,14 @@ rpm -vv --import "${PK}" 2>&1
 set -x
 
 "#,
-cmd,
-r#"
+        cmd,
+        r#"
 
 echo "\### Container should exit any second now"
 exit 0
-"#].join("\n");
+"#,
+    ]
+    .join("\n");
 
     println!("Container execution starting...");
 

@@ -1,5 +1,5 @@
 mod traits;
-pub use self::traits::*;
+pub(crate) use traits::{algorithm, Signing, Verifying};
 
 #[cfg(feature = "signature-pgp")]
 pub mod pgp;

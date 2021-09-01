@@ -1,9 +1,12 @@
+use crate::{RPMError, RPM_MAGIC};
 use nom::bytes::complete;
 use nom::number::complete::{be_u16, be_u8};
-use std::convert::TryInto;
-
-use crate::constants::*;
-use crate::errors::*;
+use std::{
+    cmp::min,
+    convert::TryInto,
+    fmt::{Debug, Formatter, Result as FmtResult},
+    io::Write,
+};
 
 /// Lead of an rpm header.
 ///
@@ -25,8 +28,8 @@ pub struct Lead {
     reserved: [u8; 16],
 }
 
-impl std::fmt::Debug for Lead {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for Lead {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         let name = String::from_utf8_lossy(&self.name);
         f.debug_struct("Lead")
             .field("magic", &self.magic)
@@ -105,7 +108,7 @@ impl Lead {
         })
     }
 
-    pub(crate) fn write<W: std::io::Write>(&self, out: &mut W) -> Result<(), RPMError> {
+    pub(crate) fn write<W: Write>(&self, out: &mut W) -> Result<(), RPMError> {
         out.write_all(&self.magic)?;
         out.write_all(&self.major.to_be_bytes())?;
         out.write_all(&self.minor.to_be_bytes())?;
@@ -121,7 +124,7 @@ impl Lead {
     pub(crate) fn new(name: &str) -> Self {
         let mut name_arr = [0; 66];
         // the last byte needs to be the null terminator
-        let name_size = std::cmp::min(name_arr.len() - 1, name.len());
+        let name_size = min(name_arr.len() - 1, name.len());
 
         name_arr[..name_size].clone_from_slice(&name.as_bytes()[..name_size]);
         Lead {

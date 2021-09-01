@@ -1,26 +1,20 @@
-use sha2::Digest;
-use std::collections::{BTreeMap, BTreeSet};
-
-use std::io::{Read, Write};
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
-
-use std::path::{Path, PathBuf};
-use std::time::UNIX_EPOCH;
-
-use crate::errors::RPMError;
-use crate::sequential_cursor::SeqCursor;
-
-use super::compressor::Compressor;
-use super::headers::*;
-use super::Lead;
-use crate::constants::*;
-
 #[cfg(feature = "signature-meta")]
 use crate::signature;
+use crate::{
+    sequential_cursor::SeqCursor, Dependency, Header, IndexData, IndexEntry, IndexSignatureTag, IndexTag, Lead,
+    RPMError, RPMFileEntry, RPMFileOptions, RPMPackage, RPMPackageMetadata,
+};
+use sha2::Digest;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    io::{Read, Write},
+    path::{Path, PathBuf},
+    time::UNIX_EPOCH,
+};
 
-use crate::RPMPackage;
-use crate::RPMPackageMetadata;
+use super::compressor::Compressor;
 
 #[cfg(unix)]
 fn file_mode(file: &std::fs::File) -> Result<u32, RPMError> {

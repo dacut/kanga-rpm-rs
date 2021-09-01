@@ -9,7 +9,6 @@ use std::fmt::Debug;
 use std::io::Read;
 
 pub mod algorithm {
-
     pub trait Algorithm: super::Debug {}
     /// currently only RSA is required
     ///
@@ -103,8 +102,6 @@ where
 {
     type Signature = Vec<u8>;
     fn verify<R: Read>(&self, _data: R, _x: &[u8]) -> Result<(), RPMError> {
-        unreachable!(
-            "if you want to verify, you need to implement `verify` of the `Verifying` trait"
-        )
+        unreachable!("if you want to verify, you need to implement `verify` of the `Verifying` trait")
     }
 }

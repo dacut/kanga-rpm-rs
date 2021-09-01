@@ -1,21 +1,26 @@
-use crate::errors::*;
-use std::io::Write;
+use crate::RPMError;
+use libflate::gzip::Encoder as GzipEncoder;
+use std::{
+    io::{Result as IoResult, Write},
+    str::FromStr,
+};
+use zstd::stream::Encoder as ZstdEncoder;
 
 pub enum Compressor {
     None(Vec<u8>),
-    Gzip(libflate::gzip::Encoder<Vec<u8>>),
-    Zstd(zstd::stream::Encoder<'static, Vec<u8>>),
+    Gzip(GzipEncoder<Vec<u8>>),
+    Zstd(ZstdEncoder<'static, Vec<u8>>),
 }
 
 impl Write for Compressor {
-    fn write(&mut self, content: &[u8]) -> Result<usize, std::io::Error> {
+    fn write(&mut self, content: &[u8]) -> IoResult<usize> {
         match self {
             Compressor::None(data) => data.write(content),
             Compressor::Gzip(encoder) => encoder.write(content),
             Compressor::Zstd(encoder) => encoder.write(content),
         }
     }
-    fn flush(&mut self) -> Result<(), std::io::Error> {
+    fn flush(&mut self) -> IoResult<()> {
         match self {
             Compressor::None(data) => data.flush(),
             Compressor::Gzip(encoder) => encoder.flush(),
@@ -24,13 +29,13 @@ impl Write for Compressor {
     }
 }
 // 19 is used here as its 19 for fedora
-impl std::str::FromStr for Compressor {
+impl FromStr for Compressor {
     type Err = RPMError;
     fn from_str(raw: &str) -> Result<Self, Self::Err> {
         match raw {
             "none" => Ok(Compressor::None(Vec::new())),
-            "gzip" => Ok(Compressor::Gzip(libflate::gzip::Encoder::new(Vec::new())?)),
-            "zstd" => Ok(Compressor::Zstd(zstd::stream::Encoder::new(Vec::new(), 19)?)),
+            "gzip" => Ok(Compressor::Gzip(GzipEncoder::new(Vec::new())?)),
+            "zstd" => Ok(Compressor::Zstd(ZstdEncoder::new(Vec::new(), 19)?)),
             _ => Err(RPMError::UnknownCompressorType(raw.to_string())),
         }
     }
@@ -42,11 +47,11 @@ impl Compressor {
     }
 
     pub fn gzip() -> Result<Self, RPMError> {
-        Ok(Compressor::Gzip(libflate::gzip::Encoder::new(Vec::new())?))
+        Ok(Compressor::Gzip(GzipEncoder::new(Vec::new())?))
     }
 
     pub fn zstd(level: i32) -> Result<Self, RPMError> {
-        Ok(Compressor::Zstd(zstd::stream::Encoder::new(Vec::new(), level)?))
+        Ok(Compressor::Zstd(ZstdEncoder::new(Vec::new(), level)?))
     }
 
     pub(crate) fn finish_compression(self) -> Result<Vec<u8>, RPMError> {

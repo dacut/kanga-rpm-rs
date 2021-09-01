@@ -3,6 +3,8 @@
 //! These constants were extracted from the rpm upstream project
 //! C headers.
 
+use enum_display_derive::Display as EnumDisplay;
+use num_derive::{FromPrimitive, ToPrimitive};
 use std::fmt::Display;
 
 pub const HEADER_IMAGE: isize = 61;
@@ -14,22 +16,13 @@ pub const HEADER_SIGBASE: isize = 256;
 pub const HEADER_TAGBASE: isize = 1000;
 pub const RPMTAG_SIG_BASE: isize = HEADER_SIGBASE;
 
-#[derive(
-    num_derive::FromPrimitive,
-    num_derive::ToPrimitive,
-    Debug,
-    PartialEq,
-    Copy,
-    Clone,
-    enum_display_derive::Display,
-)]
+#[derive(FromPrimitive, ToPrimitive, Debug, PartialEq, Copy, Clone, EnumDisplay)]
 #[allow(non_camel_case_types)]
 pub enum IndexTag {
     RPMTAG_HEADERIMAGE = HEADER_IMAGE,
     RPMTAG_HEADERSIGNATURES = HEADER_SIGNATURES,
     RPMTAG_HEADERIMMUTABLE = HEADER_IMMUTABLE,
     RPMTAG_HEADERREGIONS = HEADER_REGIONS,
-
     RPMTAG_HEADERI18NTABLE = HEADER_I18NTABLE,
 
     RPMTAG_SIGSIZE = RPMTAG_SIG_BASE,
@@ -37,30 +30,22 @@ pub enum IndexTag {
     RPMTAG_SIGPGP = RPMTAG_SIG_BASE + 3,
     RPMTAG_SIGLEMD5_2 = RPMTAG_SIG_BASE + 4,
     RPMTAG_SIGMD5 = RPMTAG_SIG_BASE + 5,
-
     RPMTAG_SIGGPG = RPMTAG_SIG_BASE + 6,
     RPMTAG_SIGPGP5 = RPMTAG_SIG_BASE + 7,
-
     RPMTAG_BADSHA1_1 = RPMTAG_SIG_BASE + 8,
     RPMTAG_BADSHA1_2 = RPMTAG_SIG_BASE + 9,
     RPMTAG_PUBKEYS = RPMTAG_SIG_BASE + 10,
     RPMTAG_DSAHEADER = RPMTAG_SIG_BASE + 11,
     RPMTAG_RSAHEADER = RPMTAG_SIG_BASE + 12,
     RPMTAG_SHA1HEADER = RPMTAG_SIG_BASE + 13,
-
     RPMTAG_LONGSIGSIZE = RPMTAG_SIG_BASE + 14,
     RPMTAG_LONGARCHIVESIZE = RPMTAG_SIG_BASE + 15,
-
     RPMTAG_SHA256HEADER = RPMTAG_SIG_BASE + 17,
 
     RPMTAG_NAME = 1000,
-
     RPMTAG_VERSION = 1001,
-
     RPMTAG_RELEASE = 1002,
-
     RPMTAG_EPOCH = 1003,
-
     RPMTAG_SUMMARY = 1004,
     RPMTAG_DESCRIPTION = 1005,
     RPMTAG_BUILDTIME = 1006,
@@ -93,7 +78,6 @@ pub enum IndexTag {
     RPMTAG_FILERDEVS = 1033,
     RPMTAG_FILEMTIMES = 1034,
     RPMTAG_FILEDIGESTS = 1035,
-
     RPMTAG_FILELINKTOS = 1036,
     RPMTAG_FILEFLAGS = 1037,
     RPMTAG_ROOT = 1038,
@@ -106,16 +90,13 @@ pub enum IndexTag {
     RPMTAG_FILEVERIFYFLAGS = 1045,
     RPMTAG_ARCHIVESIZE = 1046,
     RPMTAG_PROVIDENAME = 1047,
-
     RPMTAG_REQUIREFLAGS = 1048,
     RPMTAG_REQUIRENAME = 1049,
-
     RPMTAG_REQUIREVERSION = 1050,
     RPMTAG_NOSOURCE = 1051,
     RPMTAG_NOPATCH = 1052,
     RPMTAG_CONFLICTFLAGS = 1053,
     RPMTAG_CONFLICTNAME = 1054,
-
     RPMTAG_CONFLICTVERSION = 1055,
     RPMTAG_DEFAULTPREFIX = 1056,
     RPMTAG_BUILDROOT = 1057,
@@ -143,7 +124,6 @@ pub enum IndexTag {
     RPMTAG_POSTUNPROG = 1088,
     RPMTAG_BUILDARCHS = 1089,
     RPMTAG_OBSOLETENAME = 1090,
-
     RPMTAG_VERIFYSCRIPTPROG = 1091,
     RPMTAG_TRIGGERSCRIPTPROG = 1092,
     RPMTAG_DOCDIR = 1093,
@@ -210,16 +190,13 @@ pub enum IndexTag {
     RPMTAG_POSTTRANSPROG = 1154,
     RPMTAG_DISTTAG = 1155,
     RPMTAG_OLDSUGGESTSNAME = 1156,
-
     RPMTAG_OLDSUGGESTSVERSION = 1157,
     RPMTAG_OLDSUGGESTSFLAGS = 1158,
     RPMTAG_OLDENHANCESNAME = 1159,
-
     RPMTAG_OLDENHANCESVERSION = 1160,
     RPMTAG_OLDENHANCESFLAGS = 1161,
     RPMTAG_PRIORITY = 1162,
     RPMTAG_CVSID = 1163,
-
     RPMTAG_BLINKPKGID = 1164,
     RPMTAG_BLINKHDRID = 1165,
     RPMTAG_BLINKNEVRA = 1166,
@@ -253,7 +230,6 @@ pub enum IndexTag {
     RPMTAG_BUILDOBSOLETES = 1194,
     RPMTAG_DBINSTANCE = 1195,
     RPMTAG_NVRA = 1196,
-
     RPMTAG_FILENAMES = 5000,
     RPMTAG_FILEPROVIDE = 5001,
     RPMTAG_FILEREQUIRE = 5002,
@@ -300,19 +276,15 @@ pub enum IndexTag {
     RPMTAG_CONFLICTNEVRS = 5044,
     RPMTAG_FILENLINKS = 5045,
     RPMTAG_RECOMMENDNAME = 5046,
-
     RPMTAG_RECOMMENDVERSION = 5047,
     RPMTAG_RECOMMENDFLAGS = 5048,
     RPMTAG_SUGGESTNAME = 5049,
-
     RPMTAG_SUGGESTVERSION = 5050,
     RPMTAG_SUGGESTFLAGS = 5051,
     RPMTAG_SUPPLEMENTNAME = 5052,
-
     RPMTAG_SUPPLEMENTVERSION = 5053,
     RPMTAG_SUPPLEMENTFLAGS = 5054,
     RPMTAG_ENHANCENAME = 5055,
-
     RPMTAG_ENHANCEVERSION = 5056,
     RPMTAG_ENHANCEFLAGS = 5057,
     RPMTAG_RECOMMENDNEVRS = 5058,
@@ -356,15 +328,7 @@ pub enum IndexTag {
     RPMTAG_MODULARITYLABEL = 5096,
 }
 
-#[derive(
-    num_derive::FromPrimitive,
-    num_derive::ToPrimitive,
-    Debug,
-    PartialEq,
-    Copy,
-    Clone,
-    enum_display_derive::Display,
-)]
+#[derive(FromPrimitive, ToPrimitive, Debug, PartialEq, Copy, Clone, EnumDisplay)]
 #[allow(non_camel_case_types)]
 pub enum IndexSignatureTag {
     HEADER_SIGNATURES = HEADER_SIGNATURES,
@@ -480,19 +444,3 @@ pub const RPMFILE_DOC: i32 = 1 << 1;
 // const RPMFILE_LICENSE: i32 = (1 << 7);
 // const RPMFILE_README: i32 = (1 << 8);
 // const RPMFILE_EXCLUDE: i32 = (1 << 9);
-
-
-// copied from rpmpgp.h
-// should be technically equiv to 
-// `pgp::crypto::hash::HashAlgorithm`
-// but that is only available with feature `signature`
-pub const PGPHASHALGO_MD5: i32 =  1;
-pub const PGPHASHALGO_SHA1: i32 =  2;
-pub const PGPHASHALGO_RIPEMD160: i32 =  3;
-pub const PGPHASHALGO_MD2: i32 =  5;
-pub const PGPHASHALGO_TIGER192: i32 =  6;
-pub const PGPHASHALGO_HAVAL_5_160: i32 =  7;
-pub const PGPHASHALGO_SHA256: i32 =  8;
-pub const PGPHASHALGO_SHA384: i32 =  9;
-pub const PGPHASHALGO_SHA512: i32 = 10;
-pub const PGPHASHALGO_SHA224: i32 = 11;

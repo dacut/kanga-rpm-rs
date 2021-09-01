@@ -1,14 +1,5 @@
+use crate::{sequential_cursor::SeqCursor, signature, Header, IndexSignatureTag, IndexTag, Lead, RPMError, LEAD_SIZE};
 use sha2::Digest;
-
-use super::headers::*;
-
-use crate::constants::*;
-use crate::sequential_cursor::SeqCursor;
-
-use crate::errors::*;
-
-use super::Lead;
-use crate::signature;
 
 use std::io::{Read, Seek, SeekFrom};
 /// A complete rpm file.
@@ -52,8 +43,7 @@ impl RPMPackage {
         let mut header_bytes = Vec::<u8>::with_capacity(1024);
         self.metadata.header.write(&mut header_bytes)?;
 
-        let mut header_and_content_cursor =
-            SeqCursor::new(&[header_bytes.as_slice(), self.content.as_slice()]);
+        let mut header_and_content_cursor = SeqCursor::new(&[header_bytes.as_slice(), self.content.as_slice()]);
 
         let mut hasher = md5::Md5::default();
         {
@@ -75,8 +65,7 @@ impl RPMPackage {
 
         let rsa_signature_spanning_header_only = signer.sign(header_bytes.as_slice())?;
 
-        let rsa_signature_spanning_header_and_archive =
-            signer.sign(&mut header_and_content_cursor)?;
+        let rsa_signature_spanning_header_and_archive = signer.sign(&mut header_and_content_cursor)?;
 
         // TODO FIXME verify this is the size we want, I don't think it is
         // TODO maybe use signature_size instead of size
@@ -104,27 +93,18 @@ impl RPMPackage {
         let mut header_bytes = Vec::<u8>::with_capacity(1024);
         self.metadata.header.write(&mut header_bytes)?;
 
-        let signature_header_only = self
-            .metadata
-            .signature
-            .get_entry_binary_data(IndexSignatureTag::RPMSIGTAG_RSA)?;
+        let signature_header_only = self.metadata.signature.get_entry_binary_data(IndexSignatureTag::RPMSIGTAG_RSA)?;
 
         crate::signature::echo_signature("signature_header(header only)", signature_header_only);
 
-        let signature_header_and_content = self
-            .metadata
-            .signature
-            .get_entry_binary_data(IndexSignatureTag::RPMSIGTAG_PGP)?;
+        let signature_header_and_content =
+            self.metadata.signature.get_entry_binary_data(IndexSignatureTag::RPMSIGTAG_PGP)?;
 
-        crate::signature::echo_signature(
-            "signature_header(header and content)",
-            signature_header_and_content,
-        );
+        crate::signature::echo_signature("signature_header(header and content)", signature_header_and_content);
 
         verifier.verify(header_bytes.as_slice(), signature_header_only)?;
 
-        let header_and_content_cursor =
-            SeqCursor::new(&[header_bytes.as_slice(), self.content.as_slice()]);
+        let header_and_content_cursor = SeqCursor::new(&[header_bytes.as_slice(), self.content.as_slice()]);
 
         verifier.verify(header_and_content_cursor, signature_header_and_content)?;
 

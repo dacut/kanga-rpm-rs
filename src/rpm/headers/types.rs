@@ -1,6 +1,5 @@
 //! A collection of types used in various header records.
-
-use crate::constants::*;
+use crate::{RPMFILE_CONFIG, RPMFILE_DOC, RPMSENSE_ANY, RPMSENSE_EQUAL, RPMSENSE_GREATER, RPMSENSE_LESS};
 
 /// Describes a file present in the rpm file.
 pub struct RPMFileEntry {

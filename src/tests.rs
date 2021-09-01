@@ -1,4 +1,7 @@
-use super::*;
+use crate::{
+    Compressor, Dependency, Header, IndexData, IndexEntry, IndexSignatureTag, Lead, RPMBuilder, RPMFileOptions,
+    RPMPackage,
+};
 use sha2::{Digest, Sha256};
 use std::{
     error::Error,

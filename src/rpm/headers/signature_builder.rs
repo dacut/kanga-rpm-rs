@@ -1,10 +1,8 @@
 //! signature index construction as builder pattern
 
-use super::*;
-
-use super::IndexEntry;
-use crate::constants::*;
-use std::default::Default;
+use super::{Header, IndexData, IndexEntry};
+use crate::IndexSignatureTag;
+use std::{default::Default, marker::PhantomData};
 
 /// A marker trait for builder stages
 pub trait ConstructionStage {}
@@ -33,7 +31,7 @@ where
     T: ConstructionStage,
 {
     entries: Vec<IndexEntry<IndexSignatureTag>>,
-    phantom: std::marker::PhantomData<T>,
+    phantom: PhantomData<T>,
 }
 
 impl SignatureHeaderBuilder<Empty> {
@@ -60,10 +58,7 @@ where
             ),
         );
 
-        Header::<IndexSignatureTag>::from_entries(
-            self.entries,
-            IndexSignatureTag::HEADER_SIGNATURES,
-        )
+        Header::<IndexSignatureTag>::from_entries(self.entries, IndexSignatureTag::HEADER_SIGNATURES)
     }
 }
 
@@ -134,17 +129,9 @@ mod test {
             .add_signature(&rsa_sig_header_only[..], &rsa_sig_header_and_archive[..])
             .build(32i32);
 
-        assert!(header
-            .find_entry_or_err(&IndexSignatureTag::RPMSIGTAG_RSA)
-            .is_ok());
-        assert!(header
-            .find_entry_or_err(&IndexSignatureTag::RPMSIGTAG_PGP)
-            .is_ok());
-        assert!(header
-            .find_entry_or_err(&IndexSignatureTag::RPMSIGTAG_MD5)
-            .is_ok());
-        assert!(header
-            .find_entry_or_err(&IndexSignatureTag::RPMSIGTAG_SHA1)
-            .is_ok());
+        assert!(header.find_entry_or_err(&IndexSignatureTag::RPMSIGTAG_RSA).is_ok());
+        assert!(header.find_entry_or_err(&IndexSignatureTag::RPMSIGTAG_PGP).is_ok());
+        assert!(header.find_entry_or_err(&IndexSignatureTag::RPMSIGTAG_MD5).is_ok());
+        assert!(header.find_entry_or_err(&IndexSignatureTag::RPMSIGTAG_SHA1).is_ok());
     }
 }

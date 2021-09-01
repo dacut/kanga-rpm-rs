@@ -1,9 +1,7 @@
-use nom;
-use std::io;
-
-use thiserror::Error;
-
 use crate::FileDigestAlgorithm;
+use nom::{error::ErrorKind as NomErrorKind, Err as NomErr};
+use std::io;
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -16,9 +14,7 @@ pub enum RPMError {
 
     #[error("{0}")]
     Nom(String),
-    #[error(
-        "invalid magic expected: {expected} but got: {actual} - whole input was {complete_input:?}"
-    )]
+    #[error("invalid magic expected: {expected} but got: {actual} - whole input was {complete_input:?}")]
     InvalidMagic {
         expected: u8,
         actual: u8,
@@ -27,10 +23,7 @@ pub enum RPMError {
     #[error("unsupported Version {0} - only header version 1 is supported")]
     UnsupportedHeaderVersion(u8),
     #[error("invalid tag {raw_tag} for store {store_type}")]
-    InvalidTag {
-        raw_tag: u32,
-        store_type: &'static str,
-    },
+    InvalidTag { raw_tag: u32, store_type: &'static str },
     #[error("invalid tag data type in store {store_type}: expected 0 - 9 but got {raw_data_type}")]
     InvalidTagDataType {
         raw_data_type: u32,
@@ -99,13 +92,11 @@ pub enum RPMError {
     UnsupportedFileDigestAlgorithm(FileDigestAlgorithm),
 }
 
-impl From<nom::Err<(&[u8], nom::error::ErrorKind)>> for RPMError {
-    fn from(error: nom::Err<(&[u8], nom::error::ErrorKind)>) -> Self {
+impl From<NomErr<(&[u8], NomErrorKind)>> for RPMError {
+    fn from(error: NomErr<(&[u8], NomErrorKind)>) -> Self {
         match error {
-            nom::Err::Error((_, kind)) | nom::Err::Failure((_, kind)) => {
-                RPMError::Nom(kind.description().to_string())
-            }
-            nom::Err::Incomplete(_) => RPMError::Nom("unhandled incomplete".to_string()),
+            NomErr::Error((_, kind)) | NomErr::Failure((_, kind)) => RPMError::Nom(kind.description().to_string()),
+            NomErr::Incomplete(_) => RPMError::Nom("unhandled incomplete".to_string()),
         }
     }
 }

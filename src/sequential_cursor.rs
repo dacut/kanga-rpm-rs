@@ -1,6 +1,11 @@
 //! Cursor implementation over multiple slices
+use std::{
+    cmp::min,
+    io::{Cursor, Read, Result as IoResult, Seek, SeekFrom},
+};
+
 pub(crate) struct SeqCursor<'s> {
-    cursors: Vec<std::io::Cursor<&'s [u8]>>,
+    cursors: Vec<Cursor<&'s [u8]>>,
     position: u64,
     len: usize,
 }
@@ -14,7 +19,7 @@ impl<'s> SeqCursor<'s> {
     where
         'b: 's,
     {
-        let cursor = std::io::Cursor::<&'s [u8]>::new(another);
+        let cursor = Cursor::<&'s [u8]>::new(another);
         self.cursors.push(cursor);
         self.len += another.len();
     }
@@ -26,10 +31,7 @@ impl<'s> SeqCursor<'s> {
     {
         let len = slices.iter().fold(0usize, |acc, slice| slice.len() + acc);
         Self {
-            cursors: slices
-                .into_iter()
-                .map(|slice| std::io::Cursor::new(*slice))
-                .collect::<Vec<_>>(),
+            cursors: slices.into_iter().map(|slice| Cursor::new(*slice)).collect::<Vec<_>>(),
             position: 0u64,
             len,
         }
@@ -41,8 +43,8 @@ impl<'s> SeqCursor<'s> {
     }
 }
 
-impl<'s> std::io::Read for SeqCursor<'s> {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+impl<'s> Read for SeqCursor<'s> {
+    fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
         let mut total_read = 0usize;
         let mut acc_offset = 0usize;
         for cursor in self.cursors.iter_mut() {
@@ -50,7 +52,7 @@ impl<'s> std::io::Read for SeqCursor<'s> {
             acc_offset += chunk_len;
             if self.position < acc_offset as u64 {
                 let remaining_in_chunk = (acc_offset as u64 - self.position) as usize;
-                let fin = std::cmp::min(total_read + remaining_in_chunk, buf.len());
+                let fin = min(total_read + remaining_in_chunk, buf.len());
                 let read = cursor.read(&mut buf[total_read..fin])?;
                 total_read += read;
                 if total_read == buf.len() {
@@ -63,18 +65,15 @@ impl<'s> std::io::Read for SeqCursor<'s> {
     }
 }
 
-impl<'s> std::io::Seek for SeqCursor<'s> {
-    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+impl<'s> Seek for SeqCursor<'s> {
+    fn seek(&mut self, pos: SeekFrom) -> IoResult<u64> {
         self.position = match pos {
-            std::io::SeekFrom::Start(rel) => rel,
-            std::io::SeekFrom::End(rel) => {
-                let total = self
-                    .cursors
-                    .iter()
-                    .fold(0u64, |acc, cursor| acc + cursor.get_ref().len() as u64);
+            SeekFrom::Start(rel) => rel,
+            SeekFrom::End(rel) => {
+                let total = self.cursors.iter().fold(0u64, |acc, cursor| acc + cursor.get_ref().len() as u64);
                 (total as i64 - rel) as u64
             }
-            std::io::SeekFrom::Current(rel) => (self.position as i64 + rel) as u64,
+            SeekFrom::Current(rel) => (self.position as i64 + rel) as u64,
         };
         Ok(self.position)
     }
@@ -83,8 +82,7 @@ impl<'s> std::io::Seek for SeqCursor<'s> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::io::Read;
-    use std::io::Seek;
+    use std::io::{Read, Seek, SeekFrom};
 
     #[test]
     fn sequential_cursor() {
@@ -98,11 +96,11 @@ mod test {
         }
         let mut sq = SeqCursor::new(&[c1.as_slice(), c2.as_slice(), c3.as_slice()]);
 
-        sq.seek(std::io::SeekFrom::Current(16)).unwrap();
+        sq.seek(SeekFrom::Current(16)).unwrap();
         sq.read(&mut buf[0..4]).unwrap();
         assert_eq!(buf[0..4].to_vec(), vec![1u8, 2u8, 2u8, 2u8]);
 
-        sq.seek(std::io::SeekFrom::Current(12)).unwrap();
+        sq.seek(SeekFrom::Current(12)).unwrap();
         sq.read(&mut buf[4..8]).unwrap();
         assert_eq!(buf[4..8].to_vec(), vec![2u8, 2u8, 3u8, 3u8]);
     }

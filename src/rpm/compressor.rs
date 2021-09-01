@@ -30,16 +30,25 @@ impl std::str::FromStr for Compressor {
         match raw {
             "none" => Ok(Compressor::None(Vec::new())),
             "gzip" => Ok(Compressor::Gzip(libflate::gzip::Encoder::new(Vec::new())?)),
-            "zstd" => Ok(Compressor::Zstd(zstd::stream::Encoder::new(
-                Vec::new(),
-                19,
-            )?)),
+            "zstd" => Ok(Compressor::Zstd(zstd::stream::Encoder::new(Vec::new(), 19)?)),
             _ => Err(RPMError::UnknownCompressorType(raw.to_string())),
         }
     }
 }
 
 impl Compressor {
+    pub fn none() -> Result<Self, RPMError> {
+        Ok(Compressor::None(Vec::new()))
+    }
+
+    pub fn gzip() -> Result<Self, RPMError> {
+        Ok(Compressor::Gzip(libflate::gzip::Encoder::new(Vec::new())?))
+    }
+
+    pub fn zstd(level: i32) -> Result<Self, RPMError> {
+        Ok(Compressor::Zstd(zstd::stream::Encoder::new(Vec::new(), level)?))
+    }
+
     pub(crate) fn finish_compression(self) -> Result<Vec<u8>, RPMError> {
         match self {
             Compressor::None(data) => Ok(data),

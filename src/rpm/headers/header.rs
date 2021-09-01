@@ -1,12 +1,12 @@
 use nom::bytes::complete;
 use nom::number::complete::{be_i16, be_i32, be_i64, be_i8, be_u32, be_u8};
 
-use crate::constants::{self,*};
+use crate::constants::{self, *};
+use chrono::offset::TimeZone;
+use num_traits::FromPrimitive;
 use std::convert::TryInto;
 use std::fmt;
 use std::path::PathBuf;
-use chrono::offset::TimeZone;
-use num_traits::FromPrimitive;
 
 use super::*;
 use crate::errors::*;
@@ -15,19 +15,10 @@ use crate::errors::*;
 ///
 /// Each and every header has a particular header tag that identifies the type of
 /// the header the format / information contained in that header.
-pub trait Tag:
-    num::FromPrimitive + num::ToPrimitive + PartialEq + fmt::Display + fmt::Debug + Copy + TypeName
-{
-}
+pub trait Tag: num::FromPrimitive + num::ToPrimitive + PartialEq + fmt::Display + fmt::Debug + Copy + TypeName {}
 
 impl<T> Tag for T where
-    T: num::FromPrimitive
-        + num::ToPrimitive
-        + PartialEq
-        + fmt::Display
-        + fmt::Debug
-        + Copy
-        + TypeName
+    T: num::FromPrimitive + num::ToPrimitive + PartialEq + fmt::Display + fmt::Debug + Copy + TypeName
 {
 }
 
@@ -129,115 +120,86 @@ where
     }
 
     pub(crate) fn find_entry_or_err(&self, tag: &T) -> Result<&IndexEntry<T>, RPMError> {
-        self.index_entries
-            .iter()
-            .find(|entry| &entry.tag == tag)
-            .ok_or_else(|| RPMError::TagNotFound(tag.to_string()))
+        self.index_entries.iter().find(|entry| &entry.tag == tag).ok_or_else(|| RPMError::TagNotFound(tag.to_string()))
     }
 
     pub(crate) fn get_entry_binary_data(&self, tag: T) -> Result<&[u8], RPMError> {
         let entry = self.find_entry_or_err(&tag)?;
-        entry
-            .data
-            .as_binary()
-            .ok_or_else(|| RPMError::UnexpectedTagDataType {
-                expected_data_type: "binary",
-                actual_data_type: entry.data.to_string(),
-                tag: entry.tag.to_string(),
-            })
+        entry.data.as_binary().ok_or_else(|| RPMError::UnexpectedTagDataType {
+            expected_data_type: "binary",
+            actual_data_type: entry.data.to_string(),
+            tag: entry.tag.to_string(),
+        })
     }
 
     pub(crate) fn get_entry_string_data(&self, tag: T) -> Result<&str, RPMError> {
         let entry = self.find_entry_or_err(&tag)?;
-        entry
-            .data
-            .as_str()
-            .ok_or_else(|| RPMError::UnexpectedTagDataType {
-                expected_data_type: "string",
-                actual_data_type: entry.data.to_string(),
-                tag: entry.tag.to_string(),
-            })
+        entry.data.as_str().ok_or_else(|| RPMError::UnexpectedTagDataType {
+            expected_data_type: "string",
+            actual_data_type: entry.data.to_string(),
+            tag: entry.tag.to_string(),
+        })
     }
-
 
     pub(crate) fn get_entry_i16_array_data(&self, tag: T) -> Result<Vec<i16>, RPMError> {
         let entry = self.find_entry_or_err(&tag)?;
-        entry
-            .data
-            .as_i16_array()
-            .ok_or_else(|| RPMError::UnexpectedTagDataType {
-                expected_data_type: "i64 array",
-                actual_data_type: entry.data.to_string(),
-                tag: entry.tag.to_string(),
-            })
+        entry.data.as_i16_array().ok_or_else(|| RPMError::UnexpectedTagDataType {
+            expected_data_type: "i64 array",
+            actual_data_type: entry.data.to_string(),
+            tag: entry.tag.to_string(),
+        })
     }
 
     pub(crate) fn get_entry_i32_data(&self, tag: T) -> Result<i32, RPMError> {
         let entry = self.find_entry_or_err(&tag)?;
-        entry
-            .data
-            .as_i32()
-            .ok_or_else(|| RPMError::UnexpectedTagDataType {
-                expected_data_type: "i32",
-                actual_data_type: entry.data.to_string(),
-                tag: entry.tag.to_string(),
-            })
+        entry.data.as_i32().ok_or_else(|| RPMError::UnexpectedTagDataType {
+            expected_data_type: "i32",
+            actual_data_type: entry.data.to_string(),
+            tag: entry.tag.to_string(),
+        })
     }
 
     pub(crate) fn get_entry_i32_array_data(&self, tag: T) -> Result<Vec<i32>, RPMError> {
         let entry = self.find_entry_or_err(&tag)?;
-        entry
-            .data
-            .as_i32_array()
-            .ok_or_else(|| RPMError::UnexpectedTagDataType {
-                expected_data_type: "i32 array",
-                actual_data_type: entry.data.to_string(),
-                tag: entry.tag.to_string(),
-            })
+        entry.data.as_i32_array().ok_or_else(|| RPMError::UnexpectedTagDataType {
+            expected_data_type: "i32 array",
+            actual_data_type: entry.data.to_string(),
+            tag: entry.tag.to_string(),
+        })
     }
 
     pub(crate) fn get_entry_i64_data(&self, tag: T) -> Result<i64, RPMError> {
         let entry = self.find_entry_or_err(&tag)?;
-        entry
-            .data
-            .as_i64()
-            .ok_or_else(|| RPMError::UnexpectedTagDataType {
-                expected_data_type: "i64",
-                actual_data_type: entry.data.to_string(),
-                tag: entry.tag.to_string(),
-            })
+        entry.data.as_i64().ok_or_else(|| RPMError::UnexpectedTagDataType {
+            expected_data_type: "i64",
+            actual_data_type: entry.data.to_string(),
+            tag: entry.tag.to_string(),
+        })
     }
 
     pub(crate) fn get_entry_i64_array_data(&self, tag: T) -> Result<Vec<i64>, RPMError> {
         let entry = self.find_entry_or_err(&tag)?;
-        entry
-            .data
-            .as_i64_array()
-            .ok_or_else(|| RPMError::UnexpectedTagDataType {
-                expected_data_type: "i64 array",
-                actual_data_type: entry.data.to_string(),
-                tag: entry.tag.to_string(),
-            })
+        entry.data.as_i64_array().ok_or_else(|| RPMError::UnexpectedTagDataType {
+            expected_data_type: "i64 array",
+            actual_data_type: entry.data.to_string(),
+            tag: entry.tag.to_string(),
+        })
     }
 
     pub(crate) fn get_entry_string_array_data(&self, tag: T) -> Result<&[String], RPMError> {
         let entry = self.find_entry_or_err(&tag)?;
-        entry
-            .data
-            .as_string_array()
-            .ok_or_else(|| RPMError::UnexpectedTagDataType {
-                expected_data_type: "string array",
-                actual_data_type: entry.data.to_string(),
-                tag: entry.tag.to_string(),
-            })
+        entry.data.as_string_array().ok_or_else(|| RPMError::UnexpectedTagDataType {
+            expected_data_type: "string array",
+            actual_data_type: entry.data.to_string(),
+            tag: entry.tag.to_string(),
+        })
     }
 
     pub(crate) fn create_region_tag(tag: T, records_count: i32, offset: i32) -> IndexEntry<T> {
         let mut header_immutable_index_data = vec![];
         let mut hie = IndexEntry::new(tag, (records_count + 1) * -16, IndexData::Bin(Vec::new()));
         hie.num_items = 16;
-        hie.write_index(&mut header_immutable_index_data)
-            .expect("unabel to write to memory buffer");
+        hie.write_index(&mut header_immutable_index_data).expect("unabel to write to memory buffer");
         IndexEntry::new(tag, offset, IndexData::Bin(header_immutable_index_data))
     }
 
@@ -249,8 +211,7 @@ where
             record.offset += alignment as i32;
         }
 
-        let region_tag =
-            Self::create_region_tag(region_tag, actual_records.len() as i32, store.len() as i32);
+        let region_tag = Self::create_region_tag(region_tag, actual_records.len() as i32, store.len() as i32);
         region_tag.data.append(&mut store);
 
         let mut all_records = vec![region_tag];
@@ -296,9 +257,7 @@ impl Header<IndexSignatureTag> {
         SignatureHeaderBuilder::<Empty>::new()
     }
 
-    pub(crate) fn parse_signature<I: std::io::BufRead>(
-        input: &mut I,
-    ) -> Result<Header<IndexSignatureTag>, RPMError> {
+    pub(crate) fn parse_signature<I: std::io::BufRead>(input: &mut I) -> Result<Header<IndexSignatureTag>, RPMError> {
         let result = Self::parse(input)?;
         // this structure is aligned to 8 bytes - rest is filled up with zeros.
         // if the size of our store is not a modulo of 8, we discard bytes to align to the 8 byte boundary.
@@ -386,25 +345,22 @@ impl Header<IndexTag> {
         let dirs = self.get_entry_string_array_data(IndexTag::RPMTAG_DIRNAMES)?;
 
         let n = dirs.len();
-        let v = base
-            .into_iter()
-            .zip(biject.into_iter())
-            .try_fold::<Vec<PathBuf>, _, _>(
-                Vec::<PathBuf>::with_capacity(base.len()),
-                |mut acc, item| {
-                    let (base, dir_index) = item;
-                    if let Some(dir) = dirs.get(dir_index as usize) {
-                        acc.push(PathBuf::from(dir).join(base));
-                        Ok(acc)
-                    } else {
-                        Err(RPMError::InvalidTagIndex {
-                            tag: IndexTag::RPMTAG_DIRINDEXES.to_string(),
-                            index: dir_index as u32,
-                            bound: n as u32,
-                        })
-                    }
-                },
-            )?;
+        let v = base.into_iter().zip(biject.into_iter()).try_fold::<Vec<PathBuf>, _, _>(
+            Vec::<PathBuf>::with_capacity(base.len()),
+            |mut acc, item| {
+                let (base, dir_index) = item;
+                if let Some(dir) = dirs.get(dir_index as usize) {
+                    acc.push(PathBuf::from(dir).join(base));
+                    Ok(acc)
+                } else {
+                    Err(RPMError::InvalidTagIndex {
+                        tag: IndexTag::RPMTAG_DIRINDEXES.to_string(),
+                        index: dir_index as u32,
+                        bound: n as u32,
+                    })
+                }
+            },
+        )?;
         Ok(v)
     }
 
@@ -413,13 +369,13 @@ impl Header<IndexTag> {
     /// Note that this is not necessarily the same as the digest
     /// used for headers.
     pub fn get_file_digest_algorithm(&self) -> Result<FileDigestAlgorithm, RPMError> {
-        self.get_entry_i32_data(IndexTag::RPMTAG_FILEDIGESTALGO)
-            .and_then(|x| FileDigestAlgorithm::from_i32(x).ok_or_else (|| RPMError::InvalidTagValueEnumVariant {
+        self.get_entry_i32_data(IndexTag::RPMTAG_FILEDIGESTALGO).and_then(|x| {
+            FileDigestAlgorithm::from_i32(x).ok_or_else(|| RPMError::InvalidTagValueEnumVariant {
                 tag: IndexTag::RPMTAG_FILEDIGESTALGO.to_string(),
                 variant: x as u32,
-            }))
+            })
+        })
     }
-
 
     /// Extract a the set of contained file names including the additional metadata.
     pub fn get_file_entries(&self) -> Result<Vec<FileEntry>, RPMError> {
@@ -432,42 +388,41 @@ impl Header<IndexTag> {
         let digests = self.get_entry_string_array_data(IndexTag::RPMTAG_FILEDIGESTS)?;
         let mtimes = self.get_entry_i32_array_data(IndexTag::RPMTAG_FILEMTIMES)?;
         let sizes = self.get_entry_i64_array_data(IndexTag::RPMTAG_LONGFILESIZES).or_else(|_e| {
-            self.get_entry_i32_array_data(IndexTag::RPMTAG_FILESIZES).map(|file_sizes| {
-                file_sizes.into_iter().map(|file_size| file_size as _ ).collect::<Vec<i64>>()
-            })
+            self.get_entry_i32_array_data(IndexTag::RPMTAG_FILESIZES)
+                .map(|file_sizes| file_sizes.into_iter().map(|file_size| file_size as _).collect::<Vec<i64>>())
         })?;
         let flags = self.get_entry_i32_array_data(IndexTag::RPMTAG_FILEFLAGS)?;
         // @todo
         // let caps = self.get_entry_i32_array_data(IndexTag::RPMTAG_FILECAPS)?;
 
-
         let paths = self.get_file_paths()?;
         let n = paths.len();
 
         let v = itertools::multizip((paths.into_iter(), users, groups, modes, digests, mtimes, sizes, flags))
-            .try_fold::<Vec<FileEntry>,_,Result<_, RPMError>>(
+            .try_fold::<Vec<FileEntry>, _, Result<_, RPMError>>(
                 Vec::with_capacity(n),
-                |mut acc, (path,user,group,mode, digest,mtime, size, flags)| {
-                    let digest = if digest.is_empty() { None } else { Some(FileDigest::load_from_str(algorithm, digest)?) };
+                |mut acc, (path, user, group, mode, digest, mtime, size, flags)| {
+                    let digest =
+                        if digest.is_empty() { None } else { Some(FileDigest::load_from_str(algorithm, digest)?) };
                     let utc = chrono::Utc;
                     acc.push(FileEntry {
                         path,
-                        ownership: FileOwnership{
+                        ownership: FileOwnership {
                             user: user.to_owned(),
                             group: group.to_owned(),
                         },
                         mode: FileMode(mode as u16),
-                        modified_at: utc.timestamp( mtime as i64, 0u32),
+                        modified_at: utc.timestamp(mtime as i64, 0u32),
                         digest,
                         category: FileCategory::from_i32(flags).unwrap_or_default(),
                         size: size as usize,
                     });
                     Ok(acc)
-                })?;
+                },
+            )?;
         Ok(v)
     }
 }
-
 
 /// User facing accessor type representing a file mode
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
@@ -475,13 +430,14 @@ pub struct FileMode(pub u16);
 
 /// User facing accessor type representing ownership of a file
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub struct FileOwnership{ user: String, group: String}
-
-
+pub struct FileOwnership {
+    user: String,
+    group: String,
+}
 
 /// Declaration what category this file belongs to
 /// @todo must be bitflags
-#[derive(Debug,Clone,Copy,Hash,Eq,PartialEq,enum_primitive_derive::Primitive)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, enum_primitive_derive::Primitive)]
 #[repr(i32)]
 pub enum FileCategory {
     None = 0i32,
@@ -495,10 +451,8 @@ impl Default for FileCategory {
     }
 }
 
-
-
 #[repr(i32)]
-#[derive(Debug,Clone,Copy,enum_primitive_derive::Primitive)]
+#[derive(Debug, Clone, Copy, enum_primitive_derive::Primitive)]
 pub enum FileDigestAlgorithm {
     // broken and very broken
     Md5 = constants::PGPHASHALGO_MD5,
@@ -602,27 +556,11 @@ mod tests2 {
         let truth = {
             let offset = 0;
             let entries = vec![
-                IndexEntry::new(
-                    IndexSignatureTag::RPMSIGTAG_SIZE,
-                    offset,
-                    IndexData::Int32(vec![size]),
-                ),
+                IndexEntry::new(IndexSignatureTag::RPMSIGTAG_SIZE, offset, IndexData::Int32(vec![size])),
                 // TODO consider dropping md5 in favour of sha256
-                IndexEntry::new(
-                    IndexSignatureTag::RPMSIGTAG_MD5,
-                    offset,
-                    IndexData::Bin(md5sum.to_vec()),
-                ),
-                IndexEntry::new(
-                    IndexSignatureTag::RPMSIGTAG_SHA1,
-                    offset,
-                    IndexData::StringTag(sha1.clone()),
-                ),
-                IndexEntry::new(
-                    IndexSignatureTag::RPMSIGTAG_RSA,
-                    offset,
-                    IndexData::Bin(rsa_spanning_header.to_vec()),
-                ),
+                IndexEntry::new(IndexSignatureTag::RPMSIGTAG_MD5, offset, IndexData::Bin(md5sum.to_vec())),
+                IndexEntry::new(IndexSignatureTag::RPMSIGTAG_SHA1, offset, IndexData::StringTag(sha1.clone())),
+                IndexEntry::new(IndexSignatureTag::RPMSIGTAG_RSA, offset, IndexData::Bin(rsa_spanning_header.to_vec())),
                 IndexEntry::new(
                     IndexSignatureTag::RPMSIGTAG_PGP,
                     offset,
@@ -736,11 +674,10 @@ impl<T: num::FromPrimitive + num::ToPrimitive + fmt::Debug + TypeName> IndexEntr
         let (input, raw_tag_type) = be_u32(input)?;
 
         // initialize the datatype. Parsing of the data happens later since the store comes after the index section.
-        let data =
-            IndexData::from_u32(raw_tag_type).ok_or_else(|| RPMError::InvalidTagDataType {
-                raw_data_type: raw_tag_type,
-                store_type: T::type_name(),
-            })?;
+        let data = IndexData::from_u32(raw_tag_type).ok_or_else(|| RPMError::InvalidTagDataType {
+            raw_data_type: raw_tag_type,
+            store_type: T::type_name(),
+        })?;
 
         //  next 4 bytes is the offset relative to the beginning of the store
         let (input, offset) = be_i32(input)?;
@@ -966,7 +903,6 @@ impl IndexData {
             _ => None,
         }
     }
-
 
     pub(crate) fn as_i32(&self) -> Option<i32> {
         match self {

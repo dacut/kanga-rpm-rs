@@ -110,11 +110,7 @@ impl Dependency {
         T: Into<String>,
         E: Into<String>,
     {
-        Self::new(
-            dep_name.into(),
-            RPMSENSE_LESS | RPMSENSE_EQUAL,
-            version.into(),
-        )
+        Self::new(dep_name.into(), RPMSENSE_LESS | RPMSENSE_EQUAL, version.into())
     }
 
     pub fn eq<E, T>(dep_name: T, version: E) -> Self
@@ -138,11 +134,7 @@ impl Dependency {
         T: Into<String>,
         E: Into<String>,
     {
-        Self::new(
-            dep_name.into(),
-            RPMSENSE_GREATER | RPMSENSE_EQUAL,
-            version.into(),
-        )
+        Self::new(dep_name.into(), RPMSENSE_GREATER | RPMSENSE_EQUAL, version.into())
     }
 
     pub fn any<T>(dep_name: T) -> Self

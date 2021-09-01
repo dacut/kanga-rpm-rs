@@ -8,7 +8,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
-use crate::errors::*;
+use crate::errors::RPMError;
 use crate::sequential_cursor::SeqCursor;
 
 use super::compressor::Compressor;
@@ -129,25 +129,25 @@ impl RPMBuilder {
         if options.inherit_permissions {
             options.mode = file_mode(&input)? as i32;
         }
-        self.add_data(
-            content,
-            input
-                .metadata()?
-                .modified()?
-                .duration_since(UNIX_EPOCH)
-                .expect("something really wrong with your time")
-                .as_secs() as i32,
-            options,
-        )?;
+
+        // Interpret modified time u32. This is a hack that RPM and Linux are using to get around the Y2038 issue.
+        let mod_time = input
+            .metadata()?
+            .modified()?
+            .duration_since(UNIX_EPOCH)
+            .expect("Can't represent modification time as std::time::SystemTime")
+            .as_secs();
+
+        let mod_time = match mod_time {
+            0u64..=0xffff_ffffu64 => mod_time as u32,
+            _ => panic!("Cannot handle modification times later than 2106-02-07T06:28:16Z"),
+        };
+
+        self.add_data(content, mod_time, options)?;
         Ok(self)
     }
 
-    fn add_data(
-        &mut self,
-        content: Vec<u8>,
-        modified_at: i32,
-        options: RPMFileOptions,
-    ) -> Result<(), RPMError> {
+    fn add_data(&mut self, content: Vec<u8>, modified_at: u32, options: RPMFileOptions) -> Result<(), RPMError> {
         let dest = options.destination;
         if !dest.starts_with("./") && !dest.starts_with('/') {
             return Err(RPMError::InvalidDestinationPath {
@@ -158,22 +158,14 @@ impl RPMBuilder {
 
         let pb = PathBuf::from(dest.clone());
 
-        let parent = pb
-            .parent()
-            .ok_or_else(|| RPMError::InvalidDestinationPath {
-                path: dest.clone(),
-                desc: "no parent directory found",
-            })?;
+        let parent = pb.parent().ok_or_else(|| RPMError::InvalidDestinationPath {
+            path: dest.clone(),
+            desc: "no parent directory found",
+        })?;
         let (cpio_path, dir) = if dest.starts_with('.') {
-            (
-                dest.to_string(),
-                format!("/{}/", parent.strip_prefix(".").unwrap().to_string_lossy()),
-            )
+            (dest.to_string(), format!("/{}/", parent.strip_prefix(".").unwrap().to_string_lossy()))
         } else {
-            (
-                format!(".{}", dest),
-                format!("{}/", parent.to_string_lossy()),
-            )
+            (format!(".{}", dest), format!("{}/", parent.to_string_lossy()))
         };
 
         let mut hasher = sha2::Sha256::default();
@@ -189,7 +181,7 @@ impl RPMBuilder {
             group: options.group,
             mode: options.mode as i16,
             link: options.symlink,
-            modified_at,
+            modified_at: modified_at as i32,
             dir: dir.clone(),
             sha_checksum,
         };
@@ -260,10 +252,7 @@ impl RPMBuilder {
         let header_and_content_len = header.len() + content.len();
 
         let digest_header = Header::<IndexSignatureTag>::builder()
-            .add_digest(
-                header_digest_sha1.as_str(),
-                header_and_content_digest_md5.as_slice(),
-            )
+            .add_digest(header_digest_sha1.as_str(), header_and_content_digest_md5.as_slice())
             .build(header_and_content_len as i32);
 
         let metadata = RPMPackageMetadata {
@@ -294,10 +283,8 @@ impl RPMBuilder {
 
         let header_and_content_len = header.len() + content.len();
 
-        let builder = Header::<IndexSignatureTag>::builder().add_digest(
-            header_digest_sha1.as_str(),
-            header_and_content_digest_md5.as_slice(),
-        );
+        let builder = Header::<IndexSignatureTag>::builder()
+            .add_digest(header_digest_sha1.as_str(), header_and_content_digest_md5.as_slice());
 
         let signature_header = {
             let rsa_sig_header_only = signer.sign(header.as_slice())?;
@@ -306,10 +293,7 @@ impl RPMBuilder {
             let rsa_sig_header_and_archive = signer.sign(cursor)?;
 
             builder
-                .add_signature(
-                    rsa_sig_header_only.as_ref(),
-                    rsa_sig_header_and_archive.as_ref(),
-                )
+                .add_signature(rsa_sig_header_only.as_ref(), rsa_sig_header_and_archive.as_ref())
                 .build(header_and_content_len as i32)
         };
 
@@ -385,11 +369,7 @@ impl RPMBuilder {
             file_groupnames.push(entry.group.to_owned());
             file_inodes.push(ino_index as i32);
             file_langs.push("".to_string());
-            let index = self
-                .directories
-                .iter()
-                .position(|d| d == &entry.dir)
-                .unwrap();
+            let index = self.directories.iter().position(|d| d == &entry.dir).unwrap();
             dir_indixes.push(index as i32);
             base_names.push(entry.base_name.to_owned());
             file_verify_flags.push(-1);
@@ -409,12 +389,9 @@ impl RPMBuilder {
 
         self.requires.push(Dependency::any("/bin/sh".to_string()));
 
+        self.provides.push(Dependency::eq(self.name.clone(), self.version.clone()));
         self.provides
-            .push(Dependency::eq(self.name.clone(), self.version.clone()));
-        self.provides.push(Dependency::eq(
-            format!("{}({})", self.name.clone(), self.arch.clone()),
-            self.version.clone(),
-        ));
+            .push(Dependency::eq(format!("{}({})", self.name.clone(), self.arch.clone()), self.version.clone()));
 
         let mut provide_names = Vec::new();
         let mut provide_flags = Vec::new();
@@ -458,173 +435,45 @@ impl RPMBuilder {
 
         let offset = 0;
         let mut actual_records = vec![
-            IndexEntry::new(
-                IndexTag::RPMTAG_HEADERI18NTABLE,
-                offset,
-                IndexData::StringTag("C".to_string()),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_NAME,
-                offset,
-                IndexData::StringTag(self.name),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_EPOCH,
-                offset,
-                IndexData::Int32(vec![self.epoch]),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_VERSION,
-                offset,
-                IndexData::StringTag(self.version),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_RELEASE,
-                offset,
-                IndexData::StringTag(self.release),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_DESCRIPTION,
-                offset,
-                IndexData::StringTag(self.desc.clone()),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_SUMMARY,
-                offset,
-                IndexData::StringTag(self.desc),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_SIZE,
-                offset,
-                IndexData::Int32(vec![combined_file_sizes]),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_LICENSE,
-                offset,
-                IndexData::StringTag(self.license),
-            ),
+            IndexEntry::new(IndexTag::RPMTAG_HEADERI18NTABLE, offset, IndexData::StringTag("C".to_string())),
+            IndexEntry::new(IndexTag::RPMTAG_NAME, offset, IndexData::StringTag(self.name)),
+            IndexEntry::new(IndexTag::RPMTAG_EPOCH, offset, IndexData::Int32(vec![self.epoch])),
+            IndexEntry::new(IndexTag::RPMTAG_VERSION, offset, IndexData::StringTag(self.version)),
+            IndexEntry::new(IndexTag::RPMTAG_RELEASE, offset, IndexData::StringTag(self.release)),
+            IndexEntry::new(IndexTag::RPMTAG_DESCRIPTION, offset, IndexData::StringTag(self.desc.clone())),
+            IndexEntry::new(IndexTag::RPMTAG_SUMMARY, offset, IndexData::StringTag(self.desc)),
+            IndexEntry::new(IndexTag::RPMTAG_SIZE, offset, IndexData::Int32(vec![combined_file_sizes])),
+            IndexEntry::new(IndexTag::RPMTAG_LICENSE, offset, IndexData::StringTag(self.license)),
             // https://fedoraproject.org/wiki/RPMGroups
             // IndexEntry::new(IndexTag::RPMTAG_GROUP, offset, IndexData::I18NString(group)),
-            IndexEntry::new(
-                IndexTag::RPMTAG_OS,
-                offset,
-                IndexData::StringTag("linux".to_string()),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_GROUP,
-                offset,
-                IndexData::I18NString(vec!["Unspecified".to_string()]),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_ARCH,
-                offset,
-                IndexData::StringTag(self.arch),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_PAYLOADFORMAT,
-                offset,
-                IndexData::StringTag("cpio".to_string()),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_FILESIZES,
-                offset,
-                IndexData::Int32(file_sizes),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_FILEMODES,
-                offset,
-                IndexData::Int16(file_modes),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_FILERDEVS,
-                offset,
-                IndexData::Int16(file_rdevs),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_FILEMTIMES,
-                offset,
-                IndexData::Int32(file_mtimes),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_FILEDIGESTS,
-                offset,
-                IndexData::StringArray(file_hashes),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_FILELINKTOS,
-                offset,
-                IndexData::StringArray(file_linktos),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_FILEFLAGS,
-                offset,
-                IndexData::Int32(file_flags),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_FILEUSERNAME,
-                offset,
-                IndexData::StringArray(file_usernames),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_FILEGROUPNAME,
-                offset,
-                IndexData::StringArray(file_groupnames),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_FILEDEVICES,
-                offset,
-                IndexData::Int32(file_devices),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_FILEINODES,
-                offset,
-                IndexData::Int32(file_inodes),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_DIRINDEXES,
-                offset,
-                IndexData::Int32(dir_indixes),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_FILELANGS,
-                offset,
-                IndexData::StringArray(file_langs),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_FILEDIGESTALGO,
-                offset,
-                IndexData::Int32(vec![8]),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_FILEVERIFYFLAGS,
-                offset,
-                IndexData::Int32(file_verify_flags),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_BASENAMES,
-                offset,
-                IndexData::StringArray(base_names),
-            ),
+            IndexEntry::new(IndexTag::RPMTAG_OS, offset, IndexData::StringTag("linux".to_string())),
+            IndexEntry::new(IndexTag::RPMTAG_GROUP, offset, IndexData::I18NString(vec!["Unspecified".to_string()])),
+            IndexEntry::new(IndexTag::RPMTAG_ARCH, offset, IndexData::StringTag(self.arch)),
+            IndexEntry::new(IndexTag::RPMTAG_PAYLOADFORMAT, offset, IndexData::StringTag("cpio".to_string())),
+            IndexEntry::new(IndexTag::RPMTAG_FILESIZES, offset, IndexData::Int32(file_sizes)),
+            IndexEntry::new(IndexTag::RPMTAG_FILEMODES, offset, IndexData::Int16(file_modes)),
+            IndexEntry::new(IndexTag::RPMTAG_FILERDEVS, offset, IndexData::Int16(file_rdevs)),
+            IndexEntry::new(IndexTag::RPMTAG_FILEMTIMES, offset, IndexData::Int32(file_mtimes)),
+            IndexEntry::new(IndexTag::RPMTAG_FILEDIGESTS, offset, IndexData::StringArray(file_hashes)),
+            IndexEntry::new(IndexTag::RPMTAG_FILELINKTOS, offset, IndexData::StringArray(file_linktos)),
+            IndexEntry::new(IndexTag::RPMTAG_FILEFLAGS, offset, IndexData::Int32(file_flags)),
+            IndexEntry::new(IndexTag::RPMTAG_FILEUSERNAME, offset, IndexData::StringArray(file_usernames)),
+            IndexEntry::new(IndexTag::RPMTAG_FILEGROUPNAME, offset, IndexData::StringArray(file_groupnames)),
+            IndexEntry::new(IndexTag::RPMTAG_FILEDEVICES, offset, IndexData::Int32(file_devices)),
+            IndexEntry::new(IndexTag::RPMTAG_FILEINODES, offset, IndexData::Int32(file_inodes)),
+            IndexEntry::new(IndexTag::RPMTAG_DIRINDEXES, offset, IndexData::Int32(dir_indixes)),
+            IndexEntry::new(IndexTag::RPMTAG_FILELANGS, offset, IndexData::StringArray(file_langs)),
+            IndexEntry::new(IndexTag::RPMTAG_FILEDIGESTALGO, offset, IndexData::Int32(vec![8])),
+            IndexEntry::new(IndexTag::RPMTAG_FILEVERIFYFLAGS, offset, IndexData::Int32(file_verify_flags)),
+            IndexEntry::new(IndexTag::RPMTAG_BASENAMES, offset, IndexData::StringArray(base_names)),
             IndexEntry::new(
                 IndexTag::RPMTAG_DIRNAMES,
                 offset,
                 IndexData::StringArray(self.directories.into_iter().collect()),
             ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_PROVIDENAME,
-                offset,
-                IndexData::StringArray(provide_names),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_PROVIDEVERSION,
-                offset,
-                IndexData::StringArray(provide_versions),
-            ),
-            IndexEntry::new(
-                IndexTag::RPMTAG_PROVIDEFLAGS,
-                offset,
-                IndexData::Int32(provide_flags),
-            ),
+            IndexEntry::new(IndexTag::RPMTAG_PROVIDENAME, offset, IndexData::StringArray(provide_names)),
+            IndexEntry::new(IndexTag::RPMTAG_PROVIDEVERSION, offset, IndexData::StringArray(provide_versions)),
+            IndexEntry::new(IndexTag::RPMTAG_PROVIDEFLAGS, offset, IndexData::Int32(provide_flags)),
         ];
 
         let possible_compression_details = self.compressor.get_details();

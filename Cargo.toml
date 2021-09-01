@@ -1,15 +1,16 @@
 [package]
-name = "rpm-rs"
-version = "0.6.0"
+name = "kanga-rpm-rs"
+version = "0.7.0"
 authors = [
+    "David Cuthbert <dacut@kanga.org>",
     "René Richter <richterrettich@gmail.com>",
     "Bernhard Schuster <bernhard@ahoi.io>"
 ]
 edition = "2018"
 license = "Apache-2.0"
-description = "A pure rust library for building and parsing RPM's"
-homepage = "https://github.com/Richterrettich/rpm-rs"
-repository = "https://github.com/Richterrettich/rpm-rs"
+description = "A pure Rust library for building and parsing RPM files."
+homepage = "https://github.com/dacut/kanga-rpm-rs"
+repository = "https://github.com/dacut/kanga-rpm-rs"
 readme = "README.md"
 keywords = ["RPM", "packaging"]
 categories = ["parsing", "development-tools"]
@@ -18,23 +19,25 @@ categories = ["parsing", "development-tools"]
 name = "rpm"
 
 [dependencies]
-thiserror = "1"
-nom = "7.0"
-num-traits = "0.2"
-num-derive = "0.3"
-num = "0.4"
-enum-primitive-derive = "0.2"
-enum-display-derive = "0.1"
+chrono = "0.4"
 cpio = "0.2"
+enum-display-derive = "0.1"
+enum-primitive-derive = "0.2"
+hex = { version = "0.4", features = ["std"] }
+itertools = "0.10"
 # consider migrating to flate2
 libflate = "1"
-sha2 = "0.9"
-md-5 = "0.9"
-sha1 = "0.6"
-rand = { version = "0.8" }
-pgp = { version = "0.7.2", optional = true }
-chrono = "0.4"
 log = "0.4"
+md-5 = "0.9"
+nom = "7.0"
+num = "0.4"
+num-derive = "0.3"
+num-traits = "0.2"
+pgp = { version = "0.7.2", optional = true }
+rand = { version = "0.8" }
+sha1 = "0.6"
+sha2 = "0.9"
+thiserror = "1"
 zstd = "0.9.0"
 
 [dev-dependencies]

@@ -19,10 +19,10 @@ name = "rpm"
 
 [dependencies]
 thiserror = "1"
-nom = "5.1"
+nom = "7.0"
 num-traits = "0.2"
 num-derive = "0.3"
-num = "0.2"
+num = "0.4"
 enum-display-derive = "0.1"
 cpio = "0.2"
 # consider migrating to flate2
@@ -30,17 +30,17 @@ libflate = "1"
 sha2 = "0.9"
 md-5 = "0.9"
 sha1 = "0.6"
-rand = { version = "0.7" }
+rand = { version = "0.8" }
 pgp = { version = "0.7", optional = true }
 chrono = "0.4"
 log = "0.4"
 
 [dev-dependencies]
-rsa = { version = "^0.3.0" }
+rsa = { version = "^0.5.0" }
 rsa-der = { version = "^0.2.1" }
-env_logger = "0.7"
-itertools = "0.9"
-serial_test = "0.4"
+env_logger = "0.9"
+itertools = "0.10"
+serial_test = "0.5"
 
 [features]
 default = ["signature-pgp"]

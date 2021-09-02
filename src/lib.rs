@@ -78,5 +78,5 @@ pub use crate::{
 #[cfg(test)]
 mod tests;
 
-#[cfg(all(test, feature = "test-with-podman"))]
+#[cfg(all(test, any(feature = "test-with-podman", feature = "test-with-docker")))]
 mod compat_tests;

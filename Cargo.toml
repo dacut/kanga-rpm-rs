@@ -14,6 +14,7 @@ repository = "https://github.com/dacut/kanga-rpm-rs"
 readme = "README.md"
 keywords = ["RPM", "packaging"]
 categories = ["parsing", "development-tools"]
+resolver = "2"
 
 [lib]
 name = "rpm"
